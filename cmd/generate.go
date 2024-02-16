@@ -4,8 +4,8 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"sort"
@@ -21,7 +21,8 @@ var generateCmd = &cobra.Command{
 	Use:     "generate",
 	Short:   "Generate documentation for Terraform plan output",
 	Long:    `Generates documentation from the Terraform plan output. Has resource creations, modifications and deletions.`,
-	Example: `tfplandoc generate -p /path/to/terraform/plan.json`,
+	Example: `tfplandoc generate /path/to/terraform/plan.json`,
+	Args:    cobra.ExactArgs(1),
 	Run:     runGenerateCmd,
 }
 
@@ -32,22 +33,26 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	generateCmd.PersistentFlags().StringP("planfile", "p", "", "Path to terraform plan file")
-	generateCmd.MarkFlagFilename("planfile", "json")
-	generateCmd.MarkFlagRequired("planfile")
+	generateCmd.Flags().BoolP("all", "a", false, "Generate output for all resources, even with no changes")
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// generateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 func runGenerateCmd(cmd *cobra.Command, args []string) {
-	planFile := cmd.Flag("planfile").Value.String()
-	if planFile == "" {
-		cmd.Help()
-		cobra.CheckErr(errors.New("plan file is required"))
+	//planFile := cmd.Flag("planfile").Value.String()
+	all := cmd.Flag("all").Value
+	_ = all
+
+	var inputReader io.Reader = cmd.InOrStdin()
+	if len(args) > 0 && args[0] != "-" {
+		file, err := os.Open(args[0])
+		cobra.CheckErr(err)
+		defer file.Close()
+		inputReader = file
 	}
 
-	plan, err := readPlanFile(planFile)
+	plan, err := readPlan(inputReader)
 	cobra.CheckErr(err)
 
 	resourceTable, err := generateResourceChangeTable(plan)
@@ -56,15 +61,15 @@ func runGenerateCmd(cmd *cobra.Command, args []string) {
 	err = md.NewMarkdown(os.Stdout).H1("Terraform Plan Documentation").LF().
 		Table(resourceTable).
 		LF().
-		PlainText(fmt.Sprintf("Plan file: %s", path.Clean(planFile))).
+		PlainText(fmt.Sprintf("Plan file: %s", path.Clean(args[0]))).
 		LF().Build()
 	cobra.CheckErr(err)
 }
 
-func readPlanFile(planFile string) (*terraform.PlanStruct, error) {
-	planBytes, err := os.ReadFile(planFile)
+func readPlan(r io.Reader) (*terraform.PlanStruct, error) {
+	planBytes, err := io.ReadAll(r)
 	if err != nil {
-		return nil, fmt.Errorf("error reading plan file %w", err)
+		return nil, fmt.Errorf("error reading plan: %w", err)
 	}
 
 	plan, err := terraform.ParsePlanJSON(string(planBytes))
