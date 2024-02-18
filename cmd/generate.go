@@ -18,19 +18,28 @@ import (
 
 var generateAllFlag bool
 
-var generateSymbols = map[tfjson.Action]string{
-	tfjson.ActionCreate: "🟢",
-	tfjson.ActionRead:   "🟡",
-	tfjson.ActionUpdate: "🟠",
-	tfjson.ActionDelete: "🔴",
-	tfjson.ActionNoop:   "⚪",
+var generateSymbols = map[tfjson.Action]rune{
+	tfjson.ActionCreate: '🟢',
+	tfjson.ActionRead:   '🔵',
+	tfjson.ActionUpdate: '🟠',
+	tfjson.ActionDelete: '🔴',
+	tfjson.ActionNoop:   '⚪',
 }
 
 // generateCmd represents the generate command
 var generateCmd = &cobra.Command{
-	Use:     "generate",
-	Short:   "Generate documentation for Terraform plan output",
-	Long:    `Generates documentation from the Terraform plan output. Has resource creations, modifications and deletions.`,
+	Use:   "generate",
+	Short: "Generate documentation for Terraform plan output",
+	Long: `Generates documentation from the Terraform plan output. Has resource creations, modifications and deletions.
+
+Key:
+
+🟢 - Create
+🔵 - Read
+🟠 - Update
+🔴 - Delete
+⚪ - Noop
+`,
 	Example: `tfplandoc generate /path/to/terraform/plan.json`,
 	Args:    cobra.ExactArgs(1),
 	Run:     runGenerateCmd,
@@ -102,8 +111,8 @@ func addResourceChangeTable(m *md.Markdown, plan *tfjson.Plan, markdown, all boo
 		if !all && rc.Change.Actions[0] == tfjson.ActionNoop {
 			continue
 		}
-
-		changeRows = append(changeRows, []string{rc.Address, fmt.Sprintf("%s", rc.Change.Actions)})
+		actionStr := changeActionsToSymbolString(rc.Change.Actions)
+		changeRows = append(changeRows, []string{rc.Address, actionStr})
 	}
 	if len(changeRows) == 0 {
 		m.PlainText("***No changes detected***").LF()
@@ -113,4 +122,12 @@ func addResourceChangeTable(m *md.Markdown, plan *tfjson.Plan, markdown, all boo
 	table.Rows = changeRows
 	table.Header = []string{"Resource", "Change"}
 	m.Table(table)
+}
+
+func changeActionsToSymbolString(actions []tfjson.Action) string {
+	var res string
+	for _, action := range actions {
+		res += string(generateSymbols[action])
+	}
+	return res
 }
