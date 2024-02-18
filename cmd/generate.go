@@ -18,6 +18,14 @@ import (
 
 var generateAllFlag bool
 
+var generateSymbols = map[tfjson.Action]string{
+	tfjson.ActionCreate: "🟢",
+	tfjson.ActionRead:   "🟡",
+	tfjson.ActionUpdate: "🟠",
+	tfjson.ActionDelete: "🔴",
+	tfjson.ActionNoop:   "⚪",
+}
+
 // generateCmd represents the generate command
 var generateCmd = &cobra.Command{
 	Use:     "generate",
@@ -67,11 +75,9 @@ func readPlan(r io.Reader) (*tfjson.Plan, error) {
 		return nil, fmt.Errorf("error reading plan: %w", err)
 	}
 	plan := new(tfjson.Plan)
-	json.Unmarshal(planBytes, plan)
+	err = json.Unmarshal(planBytes, plan)
+	cobra.CheckErr(err)
 
-	if err != nil {
-		return nil, fmt.Errorf("error parsing plan file %w", err)
-	}
 	return plan, nil
 }
 
@@ -96,6 +102,7 @@ func addResourceChangeTable(m *md.Markdown, plan *tfjson.Plan, markdown, all boo
 		if !all && rc.Change.Actions[0] == tfjson.ActionNoop {
 			continue
 		}
+
 		changeRows = append(changeRows, []string{rc.Address, fmt.Sprintf("%s", rc.Change.Actions)})
 	}
 	if len(changeRows) == 0 {
