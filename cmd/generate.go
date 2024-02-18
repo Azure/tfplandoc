@@ -4,16 +4,16 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path"
-	"sort"
+	"slices"
 
 	md "github.com/go-spectest/markdown"
-	"github.com/gruntwork-io/terratest/modules/terraform"
+	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/maps"
 )
 
 // generateCmd represents the generate command
@@ -40,7 +40,6 @@ func init() {
 }
 
 func runGenerateCmd(cmd *cobra.Command, args []string) {
-	//planFile := cmd.Flag("planfile").Value.String()
 	all := cmd.Flag("all").Value
 	_ = all
 
@@ -55,10 +54,10 @@ func runGenerateCmd(cmd *cobra.Command, args []string) {
 	plan, err := readPlan(inputReader)
 	cobra.CheckErr(err)
 
-	resourceTable, err := generateResourceChangeTable(plan)
+	resourceTable, err := generateResourceChangeTable(plan, false)
 	cobra.CheckErr(err)
 
-	err = md.NewMarkdown(os.Stdout).H1("Terraform Plan Documentation").LF().
+	err = md.NewMarkdown(os.Stdout).H2("Terraform Plan Documentation").LF().
 		Table(resourceTable).
 		LF().
 		PlainText(fmt.Sprintf("Plan file: %s", path.Clean(args[0]))).
@@ -66,28 +65,43 @@ func runGenerateCmd(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(err)
 }
 
-func readPlan(r io.Reader) (*terraform.PlanStruct, error) {
+func readPlan(r io.Reader) (*tfjson.Plan, error) {
 	planBytes, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("error reading plan: %w", err)
 	}
+	plan := new(tfjson.Plan)
+	json.Unmarshal(planBytes, plan)
 
-	plan, err := terraform.ParsePlanJSON(string(planBytes))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing plan file %w", err)
 	}
 	return plan, nil
 }
 
-func generateResourceChangeTable(plan *terraform.PlanStruct) (md.TableSet, error) {
+func generateResourceChangeTable(plan *tfjson.Plan, all bool) (md.TableSet, error) {
 	var result md.TableSet
-	changeRows := make([][]string, len(plan.ResourceChangesMap))
-	resourceMapKeys := maps.Keys(plan.ResourceChangesMap)
-	sort.Strings(resourceMapKeys)
-	i := 0
-	for _, key := range resourceMapKeys {
-		changeRows[i] = []string{key, fmt.Sprintf("%s", plan.ResourceChangesMap[key].Change.Actions)}
-		i++
+	slices.SortFunc(plan.ResourceChanges, func(a, b *tfjson.ResourceChange) int {
+		// negative if a < b
+		if a.Address < b.Address {
+			return -1
+		}
+		// positive if a > b
+		if a.Address > b.Address {
+			return 1
+		}
+		// zero if a == b
+		return 0
+	})
+	changeRows := make([][]string, 0, len(plan.ResourceChanges))
+	for _, rc := range plan.ResourceChanges {
+		if len(rc.Change.Actions) == 0 {
+			continue
+		}
+		if !all && rc.Change.Actions[0] == tfjson.ActionNoop {
+			continue
+		}
+		changeRows = append(changeRows, []string{rc.Address, fmt.Sprintf("%s", rc.Change.Actions)})
 	}
 	result.Header = []string{"Resource", "Change"}
 	result.Rows = changeRows
