@@ -10,27 +10,29 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 
-	md "github.com/go-spectest/markdown"
 	tfjson "github.com/hashicorp/terraform-json"
+	md "github.com/nao1215/markdown"
 	"github.com/spf13/cobra"
 )
 
-var generateAllFlag bool
+var generateAllFlag, textFlag bool
 
 var generateSymbols = map[tfjson.Action]rune{
-	tfjson.ActionCreate: '🟢',
-	tfjson.ActionRead:   '🔵',
-	tfjson.ActionUpdate: '🟠',
-	tfjson.ActionDelete: '🔴',
-	tfjson.ActionNoop:   '⚪',
+	tfjson.ActionCreate:     '🟢',
+	tfjson.ActionRead:       '🔵',
+	tfjson.ActionUpdate:     '🟠',
+	tfjson.ActionDelete:     '🔴',
+	tfjson.ActionNoop:       '⚪',
+	tfjson.Action("forget"): '🟣',
 }
 
 // generateCmd represents the generate command
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate documentation for Terraform plan output",
-	Long: `Generates documentation from the Terraform plan output. Has resource creations, modifications and deletions.
+	Long: `Generates documentation from the Terraform plan output. Has resource/output creations, modifications and deletions.
 
 Key:
 
@@ -39,6 +41,8 @@ Key:
 🟠 - Update
 🔴 - Delete
 ⚪ - Noop
+🟣 - Forget (remove form state but do not destroy)
+
 `,
 	Example: `tfplandoc generate /path/to/terraform/plan.json`,
 	Args:    cobra.ExactArgs(1),
@@ -53,6 +57,7 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	generateCmd.Flags().BoolVarP(&generateAllFlag, "all", "a", false, "Generate output for all resources, even with no changes")
+	generateCmd.Flags().BoolVarP(&textFlag, "text", "t", false, "Output in plain text, without symbols and color")
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// generateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -71,7 +76,10 @@ func runGenerateCmd(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(err)
 
 	output := md.NewMarkdown(os.Stdout).H2("Terraform Plan Documentation").LF()
-	addResourceChangeTable(output, plan, false, generateAllFlag)
+	output = output.H3("Resource Changes").LF()
+	addResourceChangeTable(output, plan)
+	output = output.H3("Output Changes").LF()
+	addOutputChangeTable(output, plan)
 	output.LF().
 		PlainText(fmt.Sprintf("Plan file: %s", path.Clean(args[0]))).
 		LF().Build()
@@ -90,7 +98,7 @@ func readPlan(r io.Reader) (*tfjson.Plan, error) {
 	return plan, nil
 }
 
-func addResourceChangeTable(m *md.Markdown, plan *tfjson.Plan, markdown, all bool) {
+func addResourceChangeTable(m *md.Markdown, plan *tfjson.Plan) {
 	slices.SortFunc(plan.ResourceChanges, func(a, b *tfjson.ResourceChange) int {
 		// negative if a < b
 		if a.Address < b.Address {
@@ -108,7 +116,7 @@ func addResourceChangeTable(m *md.Markdown, plan *tfjson.Plan, markdown, all boo
 		if len(rc.Change.Actions) == 0 {
 			continue
 		}
-		if !all && rc.Change.Actions[0] == tfjson.ActionNoop {
+		if !generateAllFlag && rc.Change.Actions[0] == tfjson.ActionNoop {
 			continue
 		}
 		actionStr := changeActionsToSymbolString(rc.Change.Actions)
@@ -124,7 +132,42 @@ func addResourceChangeTable(m *md.Markdown, plan *tfjson.Plan, markdown, all boo
 	m.Table(table)
 }
 
+func addOutputChangeTable(m *md.Markdown, plan *tfjson.Plan) {
+	keys := make([]string, 0, len(plan.OutputChanges))
+	for k := range plan.OutputChanges {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	changeRows := make([][]string, 0, len(plan.OutputChanges))
+	for _, key := range keys {
+		actions := plan.OutputChanges[key].Actions
+		if len(actions) == 0 {
+			continue
+		}
+		if !generateAllFlag && actions[0] == tfjson.ActionNoop {
+			continue
+		}
+		actionStr := changeActionsToSymbolString(actions)
+		changeRows = append(changeRows, []string{key, actionStr})
+	}
+	if len(changeRows) == 0 {
+		m.PlainText("***No changes detected***").LF()
+		return
+	}
+	var table md.TableSet
+	table.Rows = changeRows
+	table.Header = []string{"Output", "Change"}
+	m.Table(table)
+}
+
 func changeActionsToSymbolString(actions []tfjson.Action) string {
+	if textFlag {
+		actionsStr := make([]string, 0, len(actions))
+		for _, action := range actions {
+			actionsStr = append(actionsStr, string(action))
+		}
+		return strings.Join(actionsStr, ",")
+	}
 	var res string
 	for _, action := range actions {
 		res += string(generateSymbols[action])
