@@ -7,7 +7,7 @@ This tool generates documentation for Terraform plans. It reads the plan file an
 Download the compiled release from the [releases page](https://github.com/Azure/tfplandoc/releases), or install it using `go install`:
 
 ```bash
-go install github.com/matt-FFFFFF/tfplandoc@latest
+go install github.com/Azure/tfplandoc@latest
 ```
 
 ## Usage
