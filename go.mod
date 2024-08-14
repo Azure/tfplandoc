@@ -1,6 +1,6 @@
 module github.com/matt-FFFFFF/tfplandoc
 
-go 1.22
+go 1.22.5
 
 require (
 	github.com/hashicorp/terraform-json v0.22.1
