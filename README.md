@@ -67,12 +67,10 @@ To show all resources and outputs, use the `--all` flag:
 tfplandoc generate tfplan.json --all
 ```
 
-## Example output
+## Example output (plain text)
 
 ```text
-## Terraform Plan Documentation
-
-### Resource Changes
+#### Resource Changes
 
 |                                                    RESOURCE                                                     | CHANGE |
 |-----------------------------------------------------------------------------------------------------------------|--------|
@@ -92,7 +90,7 @@ tfplandoc generate tfplan.json --all
 | module.management.azurerm_log_analytics_solution.security_insights_for_removal                                  | 🟣     |
 | module.management.azurerm_user_assigned_identity.management["ama"]                                              | 🟢     |
 
-### Output Changes
+#### Output Changes
 
 |            OUTPUT             | CHANGE |
 |-------------------------------|--------|
@@ -102,3 +100,35 @@ tfplandoc generate tfplan.json --all
 
 Plan file: tfplan.json
 ```
+
+## Example output (formatted)
+
+#### Resource Changes
+
+|                                                    RESOURCE                                                     | CHANGE |
+|-----------------------------------------------------------------------------------------------------------------|--------|
+| module.management.azapi_resource.data_collection_rule["change_tracking"]                                        | 🟢     |
+| module.management.azapi_resource.data_collection_rule["defender_sql"]                                           | 🟢     |
+| module.management.azapi_resource.data_collection_rule["vm_insights"]                                            | 🟢     |
+| module.management.azapi_resource.sentinel_onboarding[0]                                                         | 🟢     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/AgentHealthAssessment"]       | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/AntiMalware"]                 | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/ChangeTracking"]              | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/SQLAdvancedThreatProtection"] | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/SQLAssessment"]               | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/SQLVulnerabilityAssessment"]  | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/Security"]                    | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/ServiceMap"]                  | 🔴     |
+| module.management.azurerm_log_analytics_solution.management["Microsoft/OMSGallery/Updates"]                     | 🔴     |
+| module.management.azurerm_log_analytics_solution.security_insights_for_removal                                  | 🟣     |
+| module.management.azurerm_user_assigned_identity.management["ama"]                                              | 🟢     |
+
+#### Output Changes
+
+|            OUTPUT             | CHANGE |
+|-------------------------------|--------|
+| test_data_collection_rule_ids | 🟢     |
+| test_managed_identity_ids     | 🟢     |
+
+
+Plan file: tfplan.json

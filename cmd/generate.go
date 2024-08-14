@@ -32,7 +32,7 @@ var generateSymbols = map[tfjson.Action]rune{
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate documentation for Terraform plan output",
-	Long: `Generates documentation from the Terraform plan output. Has resource/output creations, modifications and deletions.
+	Long: `Generates documentation from the Terraform plan output. Has resource/output create, read, update, delete and forget operations.
 
 Key:
 
@@ -51,16 +51,9 @@ Key:
 
 func init() {
 	rootCmd.AddCommand(generateCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
 	generateCmd.Flags().BoolVarP(&generateAllFlag, "all", "a", false, "Generate output for all resources, even with no changes")
 	generateCmd.Flags().BoolVarP(&textFlag, "text", "t", false, "Output in plain text, without symbols and color")
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// generateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }
 
 func runGenerateCmd(cmd *cobra.Command, args []string) {
@@ -75,10 +68,10 @@ func runGenerateCmd(cmd *cobra.Command, args []string) {
 	plan, err := readPlan(inputReader)
 	cobra.CheckErr(err)
 
-	output := md.NewMarkdown(os.Stdout).H2("Terraform Plan Documentation").LF()
-	output = output.H3("Resource Changes").LF()
+	output := md.NewMarkdown(os.Stdout)
+	output = output.H4("Resource Changes").LF()
 	addResourceChangeTable(output, plan)
-	output = output.H3("Output Changes").LF()
+	output = output.H4("Output Changes").LF()
 	addOutputChangeTable(output, plan)
 	output.LF().
 		PlainText(fmt.Sprintf("Plan file: %s", path.Clean(args[0]))).
